@@ -16,6 +16,7 @@
 --inference  推理模型
 --checkpoint 推理模型对应的checkpoint文件
 --Dockerfile  docker文件
+--charset.txt  模型训练和测试使用的字典表
 --LICENSE   开源协议文件，默认为MIT开源协议。
 --README.md 项目说明文件，可使用Markdowm编辑器进行编辑。
 --requirements.txt Python项目依赖列表
