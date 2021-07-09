@@ -10,17 +10,17 @@ import csv
 # 固定随机数种子
 np.random.seed(0)
 
-csv_file = 'feature.csv' #包含训练集图片信息的csv文件
-image_path = './TrainImages' #训练集图片路径
+csv_file = 'feature.csv' #保存训练集图片信息的csv文件
+image_path = './drop_TrainImages' #经过筛选后的训练集图片
 save_path = './concat_imgs' #保存拼接后图片的路径
-label_path = 'LabelTrain.txt' #训练集标签
+label_path = 'contest_label.txt' #筛选后训练集标签
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 # 提取csv文件信息
 message = pd.read_csv(csv_file)
 image_names = message["img"]
 labels = message["label"]
-# label_lengths = message["label_length"]
+label_lengths = message["label_length"]
 h48_widths = message['h48_w']
 
 # h64_widths = []
@@ -60,8 +60,8 @@ def resize_img(ori_img, resize_h):
     # resized_image /= 0.5
     return resized_image
 
-# 小图拼接
-def concat(backgound, resized_img, label, short_items, labels, concat_num):
+# 拼接小图
+def concat(backgound, resized_img, label, short_items, labels, label_lengths, concat_num):
     # 随机选取待拼接的小图
     samples = random.sample(short_items, concat_num)
     concat_image = []
@@ -89,7 +89,7 @@ def concat(backgound, resized_img, label, short_items, labels, concat_num):
         # else:
         con_img = cv2.imread(os.path.join(image_path, image_names[index]))
         con_label = labels[index]
-        # str_length = label_lengths[index]
+        str_length = label_lengths[index]
         con_resize_img = resize_img(con_img, resize_h)
         assert con_resize_img.shape[0] == resize_h
         # cv2.imshow(image_names[index], con_resize_img)
@@ -104,20 +104,18 @@ def concat(backgound, resized_img, label, short_items, labels, concat_num):
             concat_image.pop()
             concat_label.pop()
             concat_str_length.pop()
-
     assert sum(concat_length) <= max_width, \
         "concat lenth is '{}', bigger than '{}'".format(sum(concat_length), max_width)
     assert len(concat_length) == len(concat_image) == len(concat_label)
 
     concat_label = "".join(concat_label)
-
     # new_image = np.zeros((resize_h, max_width, 3), dtype=np.uint8)
     # 在背景中随机选取插入图片的空隙
     lap = max_width - sum(concat_length)
     total_img_num = len(concat_image)
     mean_lap = int(lap / total_img_num)
     end_pos = []
-    # 拼接
+
     if mean_lap == 0:
         stitcher = cv2.Stitcher.create(cv2.Stitcher_PANORAMA)
         _result, new_image = stitcher.stitch(concat_image)
@@ -137,7 +135,7 @@ def concat(backgound, resized_img, label, short_items, labels, concat_num):
                 end_pos.append(end_pos[i-1]+1+inner+concat_length[i])
         return backgound, concat_label
 
-# 提取训练集图片对应的标签
+
 file_data = {}
 with open(label_path, 'r', encoding='utf-8') as f:
     lines = f.readlines()
@@ -146,22 +144,22 @@ with open(label_path, 'r', encoding='utf-8') as f:
         ori_label = line.strip('\n').split('\t')[-1]
         file_data[name] = ori_label
 
-# 对每张小图做一次拼接
+#  选取较短图片进行拼接
 for item in tqdm(short_items):
     concat_num = random.randint(2, 6)
     index, w = item
     img_name = image_names[index]
-    # if img_name not in file_data:
-    #     print(img_name + ' is dropped')
-    #     continue
+    if img_name not in file_data:
+        # print(img_name + ' is dropped')
+        continue
     label = labels[index]
     img = cv2.imread(os.path.join(image_path, img_name))
     resized_img = resize_img(img.copy(), resize_h)
     background = cv2.imread("./bg.png")
     background = cv2.resize(background, (max_width, resize_h))
     try:
-        concat_img, concat_label = concat(background, resized_img, label, short_items, labels, concat_num)
-        cv2.imwrite(os.path.join(save_path, img_name), concat_img)
+        concat_img, concat_label = concat(background, resized_img, label, short_items, labels, label_lengths, concat_num)
+        # cv2.imwrite(os.path.join(save_path, img_name), concat_img)
         file_data[img_name] = concat_label
     except:
         pass
